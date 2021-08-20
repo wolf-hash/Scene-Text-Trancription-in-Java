@@ -17,8 +17,11 @@ public class tesseract {
         Tesseract tesseract = new Tesseract();
         tesseract.setDatapath("src/main/resources/tessdata");
         tesseract.setLanguage("eng");
-        tesseract.setPageSegMode(1);
-        tesseract.setOcrEngineMode(1);
+        tesseract.setTessVariable("tessedit_char_whitelist", "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890");
+        tesseract.setPageSegMode(6);
+        tesseract.setOcrEngineMode(2);
+        tesseract.setTessVariable("user_defined_dpi", "300");
+
         try {
             String result = tesseract.doOCR(image);
             System.out.print(result);
@@ -29,17 +32,3 @@ public class tesseract {
     }
 }
 
-
-    ////////////////////////////////////////////////////////////////////////////////////////
-//    Tesseract tesseract = new Tesseract();
-//      tesseract.setDatapath("src/main/resources/tessdata");
-//          tesseract.setLanguage("eng");
-//          tesseract.setPageSegMode(1);
-//          tesseract.setOcrEngineMode(1);
-//          try {
-//          String result = tesseract.doOCR(image, new Rectangle((int)vertices[1].x, (int)vertices[1].y , (int)(vertices[2].x-vertices[0].x), (int)(vertices[0].y-vertices[2].y)));
-//          System.out.print(result);
-//          } catch (TesseractException e) {
-//          e.printStackTrace();
-//          }
-/////////////////////////////////////////////////////////////////////////////////////////

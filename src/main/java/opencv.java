@@ -1,13 +1,7 @@
-import java.awt.Graphics2D;
-import java.awt.Polygon;
-import java.awt.Rectangle;
-import java.awt.geom.AffineTransform;
-import java.awt.geom.GeneralPath;
 import java.awt.image.BufferedImage;
 import java.awt.image.DataBufferByte;
 import java.io.ByteArrayInputStream;
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
@@ -15,7 +9,6 @@ import java.util.List;
 import javax.imageio.ImageIO;
 import net.sourceforge.tess4j.Tesseract;
 import net.sourceforge.tess4j.TesseractException;
-import net.sourceforge.tess4j.util.ImageHelper;
 import org.opencv.core.Core;
 import org.opencv.core.*;
 import org.opencv.core.MatOfFloat;
@@ -30,16 +23,14 @@ import org.opencv.utils.*;
 
 public class opencv {
 
-
   public static void main(String[] args) {
     nu.pattern.OpenCV.loadLocally();
 
-    float scoreThresh = 0.5f;
+    float scoreThresh = 0.3f;
     float nmsThresh = 0.1f;
-//////////////////////////////////
     BufferedImage image = null;
     try {
-      image = ImageIO.read(new File("src/main/resources/test3.jpg"));
+      image = ImageIO.read(new File("src/main/resources/TestImages/test7.jpg"));
     } catch (IOException e) {
       e.printStackTrace();
     }
@@ -78,7 +69,7 @@ public class opencv {
     // Render detections
     Point ratio = new Point((float)frame.cols()/siz.width, (float)frame.rows()/siz.height);
     int[] indexes = indices.toArray();
-    for(int i = 0; i<indexes.length;++i) {
+    for(int i = 0; i<indexes.length; ++i) {
       RotatedRect rot = boxesArray[indexes[i]];
       Point[] vertices = new Point[4];
       rot.points(vertices);
@@ -86,14 +77,9 @@ public class opencv {
         vertices[j].x *= ratio.x;
         vertices[j].y *= ratio.y;
       }
-      GeneralPath clip = new GeneralPath();
-      clip.moveTo(vertices[0].x - 10, vertices[0].y + 10);
-      clip.lineTo(vertices[1].x - 10, vertices[1].y - 10);
-      clip.lineTo(vertices[2].x + 10, vertices[2].y - 10);
-      clip.lineTo(vertices[3].x + 10, vertices[3].y + 10);
-      clip.closePath();
 
       double min_x = vertices[0].x, min_y = vertices[0].y;
+      double max_x = 0, max_y = 0;
       for (int j = 0; j < 4; j++) {
         if(vertices[j].x < min_x){
           min_x = vertices[j].x;
@@ -101,37 +87,51 @@ public class opencv {
         if(vertices[j].y < min_y){
           min_y = vertices[j].y;
         }
-      }
-      Rectangle rect = clip.getBounds();
-      BufferedImage img = new BufferedImage(rect.width, rect.height, BufferedImage.TYPE_3BYTE_BGR);
-      Graphics2D g2d = img.createGraphics();
-      clip.transform(AffineTransform.getTranslateInstance(-min_x, -min_y));
-      g2d.setClip(clip);
-      g2d.translate(-min_x, -min_y);
-
-      g2d.drawImage(image, 0, 0, null);
-      g2d.dispose();
-
-      try {
-        ImageIO.write(img, "png", new File("src/main/resources/Clipped.png"));
-      } catch (IOException e) {
-        e.printStackTrace();
+        if(vertices[j].x > max_x){
+          max_x = vertices[j].x;
+        }
+        if(vertices[j].y > max_y){
+          max_y = vertices[j].y;
+        }
       }
 
       TesseractRecognizer tess4j = new TesseractRecognizer();
 
-      Mat p_img = new Mat(img.getHeight(), img.getWidth(), CvType.CV_8UC3);
-      byte[] p_data = ((DataBufferByte) img.getRaster().getDataBuffer()).getData();
-      p_img.put(0,0, p_data);
-      Imgproc.cvtColor(p_img, p_img, Imgproc.COLOR_BGR2GRAY);
-      Imgproc.GaussianBlur(p_img, p_img, new Size(3, 3),0);
-      Imgproc.adaptiveThreshold(p_img, p_img, 255, Imgproc.ADAPTIVE_THRESH_MEAN_C ,Imgproc.THRESH_BINARY_INV, 99, 4);
 
-      Imgcodecs.imwrite("src/main/resources/testing.jpg", p_img);
+      Point tl = new Point(vertices[1].x - 5, vertices[1].y - 5);
+      Point tr = new Point(vertices[2].x + 5, vertices[2].y - 5);
+      Point br = new Point(vertices[3].x + 5, vertices[3].y + 5);
+      Point bl = new Point(vertices[0].x - 5, vertices[0].y + 5);
+
+      Mat destImage = new Mat((int)(max_y - min_y), (int)(max_x - min_x)  , frame.type());
+      Mat src = new MatOfPoint2f(tl, tr, br, bl);
+      Mat dst = new MatOfPoint2f(new Point(0, 0), new Point(destImage.width() - 1, 0), new Point(destImage.width() - 1, destImage.height() - 1), new Point(0, destImage.height() - 1));
+      Mat transform = Imgproc.getPerspectiveTransform(src, dst);
+      Imgproc.warpPerspective(frame, destImage, transform, destImage.size());
+      Imgcodecs.imwrite("src/main/resources/Debugging/warped.jpg", destImage);
+
+
+      Imgproc.cvtColor(destImage, destImage, Imgproc.COLOR_BGR2GRAY);
+      Imgcodecs.imwrite("src/main/resources/Debugging/gray.jpg", destImage);
+      Imgproc.GaussianBlur(destImage, destImage, new Size(3, 3),0);
+//
+//      Imgproc.adaptiveThreshold(destImage, destImage, 255, Imgproc.ADAPTIVE_THRESH_MEAN_C, Imgproc.THRESH_BINARY, 55, 4 );
+      Imgproc.threshold(destImage, destImage, 80, 255, Imgproc.THRESH_BINARY);
+      if(destImage.get(0,0)[0] == 0){
+        Core.bitwise_not(destImage, destImage);
+      }
+      Imgproc.GaussianBlur(destImage, destImage, new Size(3, 3),0);
+
+      Size scaleSize = new Size(destImage.width() * 2, destImage.height() * 2);
+      Imgproc.resize(destImage, destImage, scaleSize, 0, 0, Imgproc.INTER_CUBIC);
+      Imgproc.GaussianBlur(destImage, destImage, new Size(3, 3),0);
+
+
+      Imgcodecs.imwrite("src/main/resources/Debugging/testing.jpg", destImage);
 
 
       MatOfByte matOfByte = new MatOfByte();
-      Imgcodecs.imencode(".jpg", p_img, matOfByte);
+      Imgcodecs.imencode(".jpg", destImage, matOfByte);
       byte[] byteArray = matOfByte.toArray();
       InputStream in = new ByteArrayInputStream(byteArray);
       try {
@@ -142,13 +142,12 @@ public class opencv {
         e.printStackTrace();
       }
 
-
       for (int j = 0; j < 4; ++j) {
         Imgproc.line(frame, vertices[j], vertices[(j + 1) % 4], new Scalar(0, 0,255), 1);
       }
-//      break;
+//break;
     }
-    Imgcodecs.imwrite("src/main/resources/out.jpg", frame);
+    Imgcodecs.imwrite("src/main/resources/Debugging/out.jpg", frame);
     System.out.println(text);
   }
 
@@ -201,8 +200,11 @@ class TesseractRecognizer {
     tesseract.setDatapath("src/main/resources/tessdata");
     tesseract.setLanguage("eng");
     tesseract.setTessVariable("tessedit_char_whitelist", "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890");
-    tesseract.setPageSegMode(8);
+    tesseract.setPageSegMode(6);
     tesseract.setOcrEngineMode(2);
+    tesseract.setTessVariable("user_defined_dpi", "300");
+
+
     try {
       String result = tesseract.doOCR(image);
       return result;
