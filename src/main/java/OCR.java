@@ -21,7 +21,7 @@ import org.opencv.imgcodecs.Imgcodecs;
 import org.opencv.imgproc.Imgproc;
 import org.opencv.utils.*;
 
-public class opencv {
+public class OCR {
 
   public static void main(String[] args) {
     nu.pattern.OpenCV.loadLocally();
@@ -30,7 +30,7 @@ public class opencv {
     float nmsThresh = 0.1f;
     BufferedImage image = null;
     try {
-      image = ImageIO.read(new File("src/main/resources/TestImages/test7.jpg"));
+      image = ImageIO.read(new File("src/main/resources/TestImages/test2.jpg"));
     } catch (IOException e) {
       e.printStackTrace();
     }
